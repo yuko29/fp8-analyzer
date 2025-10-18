@@ -173,6 +173,28 @@ const FP8Analyzer = () => {
     }));
   }, [fp8Values]);
 
+  const defaultContentStyle = {
+    margin: 0,
+    padding: '10px',
+    backgroundColor: '#fff',
+    border: '1px solid #ccc',
+    whiteSpace: 'nowrap',
+  };
+
+  const CustomTooltip = ({ active, payload, label}) => {
+    if (active && payload && payload.length) {
+      const item = payload[0].payload;
+      return (
+      <div style={{defaultContentStyle}}>
+          <p>FP8 values: {item.value}</p>
+          <p>Binary: {item.binary}</p>
+          <p>Index: {item.index}</p>
+      </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white p-8">
       <div className="max-w-7xl mx-auto">
@@ -372,13 +394,14 @@ const FP8Analyzer = () => {
                     stroke="#fff"
                     label={{ value: 'FP8 Value', angle: -90, position: 'insideLeft', fill: '#fff' }}
                   />
-                  <Tooltip 
+                  {/* <Tooltip 
                     contentStyle={{ backgroundColor: '#cce0ff', border: '1px solid #475569' }}
                     formatter={(value, name) => {
                       if (name === 'value') return [typeof value === 'number' ? value.toFixed(3) : value, 'Value'];
                       return [value, name];
                     }}
-                  />
+                  /> */}
+                  <Tooltip content={<CustomTooltip />} />
                   <Scatter 
                     name="FP8 Values" 
                     data={distributionData} 
