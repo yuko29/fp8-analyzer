@@ -135,8 +135,9 @@ const FP8Analyzer = () => {
     const finiteValues = fp8Values.values.filter(v => isFinite(v.value) && v.value !== 0);
     const sorted = [...finiteValues].sort((a, b) => a.value - b.value);
     
-    // Center the indices around the midpoint
-    const midIndex = (sorted.length - 1) / 2;
+    // Center the indices around the midpoint as integers
+    const totalCount = sorted.length;
+    const midIndex = Math.floor(totalCount / 2);
     
     return sorted.map((v, idx) => ({
       index: idx - midIndex,
@@ -343,9 +344,9 @@ const FP8Analyzer = () => {
               </div>
             </div>
 
-            {/* Value Distribution (Log Scale) */}
+            {/* Value Distribution */}
             <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 mb-6 border border-white/20">
-              <h2 className="text-2xl font-bold mb-4">Value Distribution (Log10 Scale)</h2>
+              <h2 className="text-2xl font-bold mb-4">Value Distribution</h2>
               <ResponsiveContainer width="100%" height={300}>
                 <ScatterChart>
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff30" />
@@ -353,23 +354,36 @@ const FP8Analyzer = () => {
                     dataKey="index" 
                     stroke="#fff"
                     label={{ value: 'Value Index', position: 'insideBottom', offset: -5, fill: '#fff' }}
+                    ticks={(() => {
+                      if (distributionData.length === 0) return [];
+                      const min = Math.min(...distributionData.map(d => d.index));
+                      const max = Math.max(...distributionData.map(d => d.index));
+                      const range = max - min;
+                      const step = Math.max(1, Math.ceil(range / 10));
+                      const ticks = [];
+                      for (let i = Math.floor(min / step) * step; i <= max; i += step) {
+                        ticks.push(i);
+                      }
+                      if (!ticks.includes(0)) ticks.push(0);
+                      return ticks.sort((a, b) => a - b);
+                    })()}
                   />
                   <YAxis 
                     stroke="#fff"
-                    label={{ value: 'log10(|value|)', angle: -90, position: 'insideLeft', fill: '#fff' }}
+                    label={{ value: 'FP8 Value', angle: -90, position: 'insideLeft', fill: '#fff' }}
                   />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#cce0ff', border: '1px solid #475569' }}
                     formatter={(value, name) => {
-                      if (name === 'logValue') return [value.toFixed(3), 'log10(|value|)'];
+                      if (name === 'value') return [typeof value === 'number' ? value.toFixed(3) : value, 'Value'];
                       return [value, name];
                     }}
                   />
                   <Scatter 
-                    name="Values" 
+                    name="FP8 Values" 
                     data={distributionData} 
                     fill="#60a5fa"
-                    dataKey="logValue"
+                    dataKey="value"
                   />
                 </ScatterChart>
               </ResponsiveContainer>
