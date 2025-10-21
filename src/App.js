@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea } from 'recharts';
+import {LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea} from 'recharts';
 import { Settings, ZoomIn, ZoomOut } from 'lucide-react';
 
 const FP8Analyzer = () => {
@@ -152,7 +152,7 @@ const FP8Analyzer = () => {
   const histogramData = useMemo(() => {
     if (!stats || stats.minPositive === 0) return [];
     
-    const bins = 30;
+    const bins = 20;
     const minLog = Math.log10(stats.minPositive);
     const maxLog = Math.log10(stats.maxPositive);
     const binSize = (maxLog - minLog) / bins;
@@ -435,7 +435,7 @@ const FP8Analyzer = () => {
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
-              margin={{ top: 5, right: 30, left: 80, bottom: 35 }}
+              margin={{ top: 5, right: 30, left: 50, bottom: 35 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff30" />
               <XAxis 
@@ -505,18 +505,35 @@ const FP8Analyzer = () => {
         {/* Histogram */}
         <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 mb-6 border border-white/20">
           <h2 className="text-2xl font-bold mb-4">Value Histogram (Log Scale Bins)</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={histogramData}>
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart
+              data={histogramData}
+              margin={{ top: 5, right: 30, left: 30, bottom: 60 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff30" />
               <XAxis 
                 dataKey="bin" 
                 stroke="#fff"
-                tickFormatter={(val) => `10^${val.toFixed(1)}`}
-                label={{ value: 'Value Range', position: 'insideBottom', offset: -5, fill: '#fff' }}
+                tickFormatter={(val) => Math.pow(10, val).toFixed(4)}
+                label={{ 
+                  value: 'Value Range', 
+                  position: 'insideBottom', 
+                  offset: -50, 
+                  fill: '#fff' 
+                }}
+                angle={-45}
+                textAnchor="end"   
               />
               <YAxis 
                 stroke="#fff"
-                label={{ value: 'Count', angle: -90, position: 'insideLeft', fill: '#fff' }}
+                label={{ 
+                  value: 'Count', 
+                  angle: -90, 
+                  position: 'insideLeft', 
+                  fill: '#fff', 
+                  offset: 0,
+                  style: { textAnchor: 'middle' }
+                }}
               />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }}
