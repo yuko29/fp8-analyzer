@@ -448,7 +448,8 @@ const FP8Analyzer = () => {
                   const range = right - left;
                   const step = Math.max(1, Math.ceil(range / 10));
                   const ticks = [];
-                  for (let i = Math.floor(left / step) * step; i <= right; i += step) {
+                  ticks.push(left);
+                  for (let i = Math.floor(left / step) * step + step; i <= right; i += step) {
                     ticks.push(i);
                   }
                   if (!ticks.includes(0) && 0 >= left && 0 <= right) ticks.push(0);
