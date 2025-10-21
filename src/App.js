@@ -10,9 +10,8 @@ const FP8Analyzer = () => {
   
   // Zoom state
   const [zoomState, setZoomState] = useState({ left: 'dataMin', right: 'dataMax', top: 'dataMax', bottom: 'dataMin' });
-  const [refAreaLeft, setRefAreaLeft] = useState('');
-  const [refAreaRight, setRefAreaRight] = useState('');
-  const [isSelecting, setIsSelecting] = useState(false);
+  const [refAreaLeft, setRefAreaLeft] = useState(null);
+  const [refAreaRight, setRefAreaRight] = useState(null);
 
   // Calculate FP8 value from bit representation
   const calculateFP8Value = (sign, exp, mantissa) => {
@@ -184,46 +183,52 @@ const FP8Analyzer = () => {
 
   const zoomOut = () => {
     setZoomState({ left: 'dataMin', right: 'dataMax', top: 'dataMax', bottom: 'dataMin' });
+    setRefAreaLeft(null);
+    setRefAreaRight(null);
   };
 
   const handleMouseDown = (e) => {
     if (e && e.activeLabel !== undefined) {
       setRefAreaLeft(e.activeLabel);
-      setIsSelecting(true);
+      setRefAreaRight(e.activeLabel);
     }
   };
 
   const handleMouseMove = (e) => {
-    if (isSelecting && e && e.activeLabel !== undefined) {
+    if (refAreaLeft !== null && e && e.activeLabel !== undefined) {
       setRefAreaRight(e.activeLabel);
     }
   };
 
   const handleMouseUp = () => {
-    if (refAreaLeft && refAreaRight && refAreaLeft !== refAreaRight) {
-      let left = refAreaLeft;
-      let right = refAreaRight;
+    if (refAreaLeft !== null && refAreaRight !== null && refAreaLeft !== refAreaRight) {
+      let left = Math.min(refAreaLeft, refAreaRight);
+      let right = Math.max(refAreaLeft, refAreaRight);
 
-      if (left > right) [left, right] = [right, left];
-
-      const selectedData = distributionData.filter(d => d.index >= left && d.index <= right);
-      if (selectedData.length > 0) {
-        const yValues = selectedData.map(d => d.value);
-        const bottom = Math.min(...yValues);
-        const top = Math.max(...yValues);
-        
-        setZoomState({ 
-          left, 
-          right, 
-          bottom: bottom - (top - bottom) * 0.1,
-          top: top + (top - bottom) * 0.1 
-        });
+      // Find Y range more efficiently
+      const minIdx = Math.max(0, left + Math.floor(distributionData.length / 2));
+      const maxIdx = Math.min(distributionData.length - 1, right + Math.floor(distributionData.length / 2));
+      
+      let bottom = Infinity;
+      let top = -Infinity;
+      
+      for (let i = minIdx; i <= maxIdx; i++) {
+        const val = distributionData[i].value;
+        if (val < bottom) bottom = val;
+        if (val > top) top = val;
       }
+      
+      const padding = (top - bottom) * 0.1;
+      setZoomState({ 
+        left, 
+        right, 
+        bottom: bottom - padding,
+        top: top + padding 
+      });
     }
     
-    setRefAreaLeft('');
-    setRefAreaRight('');
-    setIsSelecting(false);
+    setRefAreaLeft(null);
+    setRefAreaRight(null);
   };
 
   const CustomTooltip = ({ active, payload }) => {
@@ -482,8 +487,9 @@ const FP8Analyzer = () => {
                 data={distributionData} 
                 fill="#60a5fa"
                 dataKey="value"
+                isAnimationActive={false}
               />
-              {refAreaLeft && refAreaRight && (
+              {refAreaLeft !== null && refAreaRight !== null && (
                 <ReferenceArea
                   x1={refAreaLeft}
                   x2={refAreaRight}
