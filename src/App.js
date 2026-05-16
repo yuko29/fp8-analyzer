@@ -1,80 +1,24 @@
 import React, { useState, useMemo } from 'react';
 import {LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea} from 'recharts';
 import { Settings, ZoomIn, ZoomOut } from 'lucide-react';
+import { calculateFP8Value } from './fp8/formats';
 
 const FP8Analyzer = () => {
+
   const [exponentBits, setExponentBits] = useState(4);
   const [mantissaBits, setMantissaBits] = useState(3);
   const [exponentBias, setExponentBias] = useState(7);
   const [floatFormat, setFloatFormat] = useState('IEEE');
-  
+
   // Zoom state
   const [zoomState, setZoomState] = useState({ left: 'dataMin', right: 'dataMax', top: 'dataMax', bottom: 'dataMin' });
   const [refAreaLeft, setRefAreaLeft] = useState(null);
   const [refAreaRight, setRefAreaRight] = useState(null);
 
-  // Calculate FP8 value from bit representation
-  const calculateFP8Value = (sign, exp, mantissa) => {
-    const maxExponent = (1 << exponentBits) - 1;
-    const maxMantissa = (1 << mantissaBits) - 1;
-    let value, type = 'normal';
-    
-    if (floatFormat === 'IEEE') {
-      if (exp === 0) {
-        if (mantissa === 0) {
-          value = sign === 0 ? 0 : -0;
-          type = 'zero';
-        } else {
-          value = Math.pow(-1, sign) * Math.pow(2, 1 - exponentBias) * (mantissa / Math.pow(2, mantissaBits));
-          type = 'subnormal';
-        }
-      } else if (exp === maxExponent) {
-        if (mantissa === 0) {
-          value = sign === 0 ? Infinity : -Infinity;
-          type = 'infinity';
-        } else {
-          value = NaN;
-          type = 'nan';
-        }
-      } else {
-        const actualExponent = exp - exponentBias;
-        const mantissaValue = 1 + mantissa / Math.pow(2, mantissaBits);
-        value = Math.pow(-1, sign) * Math.pow(2, actualExponent) * mantissaValue;
-      }
-    } else if (floatFormat === 'FN') {
-      if (exp === 0 && mantissa === 0) {
-        value = sign === 0 ? 0 : -0;
-        type = 'zero';
-      } else if (exp === maxExponent) {
-        value = NaN;
-        type = 'nan';
-      } else {
-        const actualExponent = exp - exponentBias;
-        const mantissaValue = (exp === 0) ? 
-          (mantissa / Math.pow(2, mantissaBits)) : 
-          (1 + mantissa / Math.pow(2, mantissaBits));
-        value = Math.pow(-1, sign) * Math.pow(2, actualExponent) * mantissaValue;
-        type = exp === 0 ? 'subnormal' : 'normal';
-      }
-    } else if (floatFormat === 'FNUZ') {
-      if (sign === 1 && exp === 0 && mantissa === 0) {
-        value = NaN;
-        type = 'nan';
-      } else if (exp === 0 && mantissa === 0) {
-        value = 0;
-        type = 'zero';
-      } else if (exp === 0) {
-        value = Math.pow(-1, sign) * Math.pow(2, 1 - exponentBias) * (mantissa / Math.pow(2, mantissaBits));
-        type = 'subnormal';
-      } else {
-        const actualExponent = exp - exponentBias;
-        const mantissaValue = 1 + mantissa / Math.pow(2, mantissaBits);
-        value = Math.pow(-1, sign) * Math.pow(2, actualExponent) * mantissaValue;
-      }
-    }
-    
-    return { value, type };
-  };
+  const formatConfig = useMemo(
+    () => ({ exponentBits, mantissaBits, exponentBias, floatFormat }),
+    [exponentBits, mantissaBits, exponentBias, floatFormat]
+  );
 
   // Calculate statistics only
   const stats = useMemo(() => {
@@ -95,7 +39,7 @@ const FP8Analyzer = () => {
     for (let sign = 0; sign <= 1; sign++) {
       for (let exp = 0; exp <= maxExponent; exp++) {
         for (let mantissa = 0; mantissa <= maxMantissa; mantissa++) {
-          const { value, type } = calculateFP8Value(sign, exp, mantissa);
+          const { value, type } = calculateFP8Value(sign, exp, mantissa, formatConfig);
           counts.total++;
           counts[type]++;
           
@@ -114,7 +58,7 @@ const FP8Analyzer = () => {
       maxPositive: maxPositive === -Infinity ? 0 : maxPositive,
       dynamicRange: (minPositive !== Infinity && maxPositive !== -Infinity) ? maxPositive / minPositive : 0
     };
-  }, [exponentBits, mantissaBits, exponentBias, floatFormat]);
+  }, [exponentBits, mantissaBits, formatConfig]);
 
   // Generate distribution data on demand (lighter memory footprint)
   const distributionData = useMemo(() => {
@@ -127,7 +71,7 @@ const FP8Analyzer = () => {
     for (let sign = 0; sign <= 1; sign++) {
       for (let exp = 0; exp <= maxExponent; exp++) {
         for (let mantissa = 0; mantissa <= maxMantissa; mantissa++) {
-          const { value, type } = calculateFP8Value(sign, exp, mantissa);
+          const { value, type } = calculateFP8Value(sign, exp, mantissa, formatConfig);
           
           if (isFinite(value) && value !== 0) {
             const binary = `${sign}${exp.toString(2).padStart(exponentBits, '0')}${mantissa.toString(2).padStart(mantissaBits, '0')}`;
@@ -164,7 +108,7 @@ const FP8Analyzer = () => {
     for (let sign = 0; sign <= 1; sign++) {
       for (let exp = 0; exp <= maxExponent; exp++) {
         for (let mantissa = 0; mantissa <= maxMantissa; mantissa++) {
-          const { value } = calculateFP8Value(sign, exp, mantissa);
+          const { value } = calculateFP8Value(sign, exp, mantissa, formatConfig);
           
           if (isFinite(value) && value !== 0) {
             const logVal = Math.log10(Math.abs(value));
