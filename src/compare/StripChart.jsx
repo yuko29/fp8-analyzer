@@ -23,8 +23,26 @@ const formatReal = (v) => {
   if (v === 0) return '0';
   const a = Math.abs(v);
   if (a < 0.01 || a >= 10000) return v.toExponential(1);
-  if (a < 1) return v.toFixed(2);
-  return v.toFixed(0);
+  // toPrecision(3) gives 3 sig figs; Number(...) strips trailing zeros so "1.50" → "1.5".
+  return Number(v.toPrecision(3)).toString();
+};
+
+// Pick ticks at multiples of 1/2/5 × 10ⁿ that fall inside [lo, hi].
+// Keeps labels honest: the displayed number is exactly the tick position.
+const niceLinearTicks = (lo, hi, targetCount = 10) => {
+  if (!(hi > lo)) return [lo];
+  const rawStep = (hi - lo) / targetCount;
+  const exp = Math.floor(Math.log10(rawStep));
+  const base = Math.pow(10, exp);
+  const m = rawStep / base;
+  const step = m < 1.5 ? base : m < 3 ? 2 * base : m < 7 ? 5 * base : 10 * base;
+  const start = Math.ceil(lo / step) * step;
+  const count = Math.floor((hi - start) / step) + 1;
+  // Round each tick to step-aligned precision to avoid 0.94000001 artifacts.
+  const decimals = Math.max(0, -Math.floor(Math.log10(step)) + 2);
+  const ticks = [];
+  for (let i = 0; i < count; i++) ticks.push(parseFloat((start + i * step).toFixed(decimals)));
+  return ticks;
 };
 
 const clampDomain = ([lo, hi], [minLo, maxHi]) => {
@@ -99,10 +117,7 @@ const StripChart = ({ datasets, scale, colors, title }) => {
 
   const xTicks = useMemo(() => {
     if (scale === 'symlog') return symlogTicks;
-    const [lo, hi] = xDomain;
-    const ticks = [];
-    for (let i = 0; i <= 10; i++) ticks.push(lo + (i * (hi - lo)) / 10);
-    return ticks;
+    return niceLinearTicks(xDomain[0], xDomain[1]);
   }, [scale, symlogTicks, xDomain]);
 
   const xTickFormatter = (xp) => formatReal(scale === 'symlog' ? symlogInverse(xp, threshold) : xp);
