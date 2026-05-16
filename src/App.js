@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea} from 'recharts';
 import { Settings, ZoomIn, ZoomOut } from 'lucide-react';
-import { calculateFP8Value } from './fp8/formats';
+import { generateFP8Data } from './fp8/generate';
 
 const FP8Analyzer = () => {
 
@@ -15,115 +15,11 @@ const FP8Analyzer = () => {
   const [refAreaLeft, setRefAreaLeft] = useState(null);
   const [refAreaRight, setRefAreaRight] = useState(null);
 
-  const formatConfig = useMemo(
-    () => ({ exponentBits, mantissaBits, exponentBias, floatFormat }),
+  const fp8Data = useMemo(
+    () => generateFP8Data({ exponentBits, mantissaBits, exponentBias, floatFormat }),
     [exponentBits, mantissaBits, exponentBias, floatFormat]
   );
-
-  // Calculate statistics only
-  const stats = useMemo(() => {
-    const totalBits = 8;
-    const signBit = 1;
-    
-    if (exponentBits + mantissaBits + signBit !== totalBits) {
-      return null;
-    }
-
-    const maxExponent = (1 << exponentBits) - 1;
-    const maxMantissa = (1 << mantissaBits) - 1;
-    
-    let counts = { total: 0, zeros: 0, subnormal: 0, normal: 0, infinity: 0, nan: 0 };
-    let minPositive = Infinity;
-    let maxPositive = -Infinity;
-
-    for (let sign = 0; sign <= 1; sign++) {
-      for (let exp = 0; exp <= maxExponent; exp++) {
-        for (let mantissa = 0; mantissa <= maxMantissa; mantissa++) {
-          const { value, type } = calculateFP8Value(sign, exp, mantissa, formatConfig);
-          counts.total++;
-          counts[type]++;
-          
-          if (isFinite(value) && value !== 0) {
-            const absVal = Math.abs(value);
-            if (absVal < minPositive) minPositive = absVal;
-            if (absVal > maxPositive) maxPositive = absVal;
-          }
-        }
-      }
-    }
-
-    return {
-      ...counts,
-      minPositive: minPositive === Infinity ? 0 : minPositive,
-      maxPositive: maxPositive === -Infinity ? 0 : maxPositive,
-      dynamicRange: (minPositive !== Infinity && maxPositive !== -Infinity) ? maxPositive / minPositive : 0
-    };
-  }, [exponentBits, mantissaBits, formatConfig]);
-
-  // Generate distribution data on demand (lighter memory footprint)
-  const distributionData = useMemo(() => {
-    if (!stats) return [];
-    
-    const maxExponent = (1 << exponentBits) - 1;
-    const maxMantissa = (1 << mantissaBits) - 1;
-    const finiteValues = [];
-
-    for (let sign = 0; sign <= 1; sign++) {
-      for (let exp = 0; exp <= maxExponent; exp++) {
-        for (let mantissa = 0; mantissa <= maxMantissa; mantissa++) {
-          const { value, type } = calculateFP8Value(sign, exp, mantissa, formatConfig);
-          
-          if (isFinite(value) && value !== 0) {
-            const binary = `${sign}${exp.toString(2).padStart(exponentBits, '0')}${mantissa.toString(2).padStart(mantissaBits, '0')}`;
-            finiteValues.push({ value, type, binary });
-          }
-        }
-      }
-    }
-
-    finiteValues.sort((a, b) => a.value - b.value);
-    const midIndex = Math.floor(finiteValues.length / 2);
-    
-    return finiteValues.map((v, idx) => ({
-      index: idx - midIndex,
-      value: v.value,
-      type: v.type,
-      binary: v.binary
-    }));
-  }, [exponentBits, mantissaBits, exponentBias, floatFormat, stats]);
-
-  // Generate histogram data (optimized binning)
-  const histogramData = useMemo(() => {
-    if (!stats || stats.minPositive === 0) return [];
-    
-    const bins = 20;
-    const minLog = Math.log10(stats.minPositive);
-    const maxLog = Math.log10(stats.maxPositive);
-    const binSize = (maxLog - minLog) / bins;
-    const histogram = new Array(bins).fill(0);
-    
-    const maxExponent = (1 << exponentBits) - 1;
-    const maxMantissa = (1 << mantissaBits) - 1;
-
-    for (let sign = 0; sign <= 1; sign++) {
-      for (let exp = 0; exp <= maxExponent; exp++) {
-        for (let mantissa = 0; mantissa <= maxMantissa; mantissa++) {
-          const { value } = calculateFP8Value(sign, exp, mantissa, formatConfig);
-          
-          if (isFinite(value) && value !== 0) {
-            const logVal = Math.log10(Math.abs(value));
-            const binIdx = Math.min(Math.floor((logVal - minLog) / binSize), bins - 1);
-            if (binIdx >= 0) histogram[binIdx]++;
-          }
-        }
-      }
-    }
-    
-    return histogram.map((count, idx) => ({
-      bin: minLog + (idx + 0.5) * binSize,
-      count
-    }));
-  }, [exponentBits, mantissaBits, exponentBias, floatFormat, stats]);
+  const { stats, distributionData, histogramData } = fp8Data ?? { stats: null, distributionData: [], histogramData: [] };
 
   const zoomOut = () => {
     setZoomState({ left: 'dataMin', right: 'dataMax', top: 'dataMax', bottom: 'dataMin' });
