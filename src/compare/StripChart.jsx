@@ -40,6 +40,8 @@ const StripChart = ({ datasets, scale, colors, title }) => {
   const isZoomable = scale === 'linear';
   const [zoomDomain, setZoomDomain] = useState(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [centerInput, setCenterInput] = useState('');
+  const [centerFocused, setCenterFocused] = useState(false);
   const wrapperRef = useRef(null);
   const panAnchorRef = useRef(null);
 
@@ -181,6 +183,24 @@ const StripChart = ({ datasets, scale, colors, title }) => {
 
   const resetZoom = () => setZoomDomain(null);
 
+  const applyCenter = (center) => {
+    const [minLo, maxHi] = defaultDomain;
+    const totalRange = maxHi - minLo;
+    const currentRange = xDomain[1] - xDomain[0];
+    // If not zoomed, auto-zoom to 20% of the total range centered on the value.
+    const visRange = zoomDomain ? currentRange : totalRange * 0.2;
+    const next = clampDomain([center - visRange / 2, center + visRange / 2], defaultDomain);
+    setZoomDomain(next);
+  };
+
+  const commitCenter = () => {
+    const v = parseFloat(centerInput);
+    if (!isNaN(v) && isFinite(v)) applyCenter(v);
+  };
+
+  const currentCenter = (xDomain[0] + xDomain[1]) / 2;
+  const centerDisplay = centerFocused ? centerInput : formatReal(currentCenter);
+
   const CompareTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const p = payload[0].payload;
@@ -199,17 +219,35 @@ const StripChart = ({ datasets, scale, colors, title }) => {
 
   return (
     <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4 gap-3 flex-wrap">
         {title && <h2 className="text-xl font-bold">{title}</h2>}
         {isZoomable && (
-          <button
-            onClick={resetZoom}
-            disabled={!zoomDomain}
-            className="flex items-center gap-2 px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ZoomOut className="w-4 h-4" />
-            Reset Zoom
-          </button>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-blue-200">Center:</span>
+              <input
+                type="text"
+                value={centerDisplay}
+                onFocus={() => { setCenterFocused(true); setCenterInput(formatReal(currentCenter)); }}
+                onBlur={() => setCenterFocused(false)}
+                onChange={(e) => setCenterInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { commitCenter(); e.currentTarget.blur(); }
+                  else if (e.key === 'Escape') e.currentTarget.blur();
+                }}
+                placeholder="e.g. 1.5e-3"
+                className="bg-white/10 px-2 py-1 rounded text-sm font-mono w-28 border border-white/10 focus:outline-none focus:border-blue-400"
+              />
+            </label>
+            <button
+              onClick={resetZoom}
+              disabled={!zoomDomain}
+              className="flex items-center gap-2 px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ZoomOut className="w-4 h-4" />
+              Reset Zoom
+            </button>
+          </div>
         )}
       </div>
       {isZoomable && (
