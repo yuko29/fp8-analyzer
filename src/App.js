@@ -2,9 +2,11 @@ import React, { useState, useMemo } from 'react';
 import {LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea} from 'recharts';
 import { Settings, ZoomIn, ZoomOut } from 'lucide-react';
 import { generateFP8Data } from './fp8/generate';
+import CompareView from './compare/CompareView';
 
 const FP8Analyzer = () => {
 
+  const [mode, setMode] = useState('single');
   const [exponentBits, setExponentBits] = useState(4);
   const [mantissaBits, setMantissaBits] = useState(3);
   const [exponentBias, setExponentBias] = useState(7);
@@ -85,16 +87,6 @@ const FP8Analyzer = () => {
     return null;
   };
 
-  if (!stats) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white p-8 flex items-center justify-center">
-        <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-6 text-center">
-          <p className="text-xl">Bits must sum to 8 (1 sign + exp + mantissa)</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white p-8">
       <div className="max-w-7xl mx-auto">
@@ -106,6 +98,34 @@ const FP8Analyzer = () => {
           <p className="text-blue-200">Interactive 8-bit Floating Point Format Explorer</p>
         </div>
 
+        {/* Mode toggle */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setMode('single')}
+            className={`px-5 py-2 rounded-lg font-medium transition-colors ${
+              mode === 'single' ? 'bg-blue-500 text-white' : 'bg-white/10 hover:bg-white/20 text-gray-300'
+            }`}
+          >
+            Single Format
+          </button>
+          <button
+            onClick={() => setMode('compare')}
+            className={`px-5 py-2 rounded-lg font-medium transition-colors ${
+              mode === 'compare' ? 'bg-blue-500 text-white' : 'bg-white/10 hover:bg-white/20 text-gray-300'
+            }`}
+          >
+            Compare
+          </button>
+        </div>
+
+        {mode === 'compare' ? (
+          <CompareView />
+        ) : !stats ? (
+          <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-6 text-center">
+            <p className="text-xl">Bits must sum to 8 (1 sign + exp + mantissa)</p>
+          </div>
+        ) : (
+          <>
         {/* Controls */}
         <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 mb-6 border border-white/20">
           <div className="mb-6">
@@ -416,6 +436,8 @@ const FP8Analyzer = () => {
             </table>
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );
