@@ -63,7 +63,7 @@ const StripChart = ({ datasets, scale, colors, title }) => {
   const wrapperRef = useRef(null);
   const panAnchorRef = useRef(null);
 
-  const { series, threshold, defaultDomain, symlogTicks } = useMemo(() => {
+  const { allPoints, threshold, defaultDomain, symlogTicks } = useMemo(() => {
     let maxAbs = 0;
     let minPositive = Infinity;
 
@@ -78,20 +78,24 @@ const StripChart = ({ datasets, scale, colors, title }) => {
 
     const threshold = minPositive === Infinity ? 1 : minPositive;
 
-    const series = datasets.map((ds, rowIdx) => ({
-      rowIdx,
-      name: ds.config.name,
-      color: colors[rowIdx % colors.length],
-      points: ds.data
-        ? ds.data.distributionData.map((p) => ({
-            x: scale === 'symlog' ? symlog(p.value, threshold) : p.value,
-            y: rowIdx,
-            value: p.value,
-            binary: p.binary,
-            formatName: ds.config.name,
-          }))
-        : [],
-    }));
+    // Flatten all formats' points into a single array so the chart uses ONE <Scatter>.
+    // With multiple <Scatter>s, the Tooltip's payload[0] is always from the first series
+    // when multiple formats have dots near the same cursor X — that desynced the tooltip
+    // from the dot the user was actually hovering. Per-point color is set via shape below.
+    // Y is inverted (format 0 → highest y) so the first FormatList entry renders at the top.
+    const allPoints = datasets.flatMap((ds, rowIdx) => {
+      if (!ds.data) return [];
+      const color = colors[rowIdx % colors.length];
+      const y = (datasets.length - 1) - rowIdx;
+      return ds.data.distributionData.map((p) => ({
+        x: scale === 'symlog' ? symlog(p.value, threshold) : p.value,
+        y,
+        value: p.value,
+        binary: p.binary,
+        formatName: ds.config.name,
+        color,
+      }));
+    });
 
     let defaultDomain, symlogTicks = null;
     if (scale === 'symlog') {
@@ -110,7 +114,7 @@ const StripChart = ({ datasets, scale, colors, title }) => {
       defaultDomain = [-maxAbs * 1.05, maxAbs * 1.05];
     }
 
-    return { series, threshold, defaultDomain, symlogTicks };
+    return { allPoints, threshold, defaultDomain, symlogTicks };
   }, [datasets, scale, colors]);
 
   const xDomain = isZoomable && zoomDomain ? zoomDomain : defaultDomain;
@@ -121,7 +125,7 @@ const StripChart = ({ datasets, scale, colors, title }) => {
   }, [scale, symlogTicks, xDomain]);
 
   const xTickFormatter = (xp) => formatReal(scale === 'symlog' ? symlogInverse(xp, threshold) : xp);
-  const yTickFormatter = (idx) => datasets[idx]?.config?.name ?? '';
+  const yTickFormatter = (yVal) => datasets[(datasets.length - 1) - yVal]?.config?.name ?? '';
 
   const getPlotMetrics = useCallback(() => {
     if (!wrapperRef.current) return null;
@@ -293,15 +297,19 @@ const StripChart = ({ datasets, scale, colors, title }) => {
               dataKey="y"
               stroke="#fff"
               domain={[-0.5, Math.max(0.5, datasets.length - 0.5)]}
-              ticks={datasets.map((_, i) => i)}
+              ticks={datasets.map((_, i) => (datasets.length - 1) - i)}
               tickFormatter={yTickFormatter}
               width={90}
               interval={0}
             />
             <Tooltip content={<CompareTooltip />} cursor={{ strokeDasharray: '3 3' }} isAnimationActive={false} />
-            {series.map((s) => (
-              <Scatter key={s.rowIdx} name={s.name} data={s.points} fill={s.color} isAnimationActive={false} />
-            ))}
+            <Scatter
+              data={allPoints}
+              shape={({ cx, cy, payload }) => (
+                <circle cx={cx} cy={cy} r={3} fill={payload.color} />
+              )}
+              isAnimationActive={false}
+            />
           </ScatterChart>
         </ResponsiveContainer>
       </div>
