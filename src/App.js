@@ -150,7 +150,7 @@ const FP8Analyzer = () => {
                     : 'bg-white/5 hover:bg-white/10 text-gray-300'
                 }`}
               >
-                <div className="font-bold">FN (Float with NaN)</div>
+                <div className="font-bold">FN (Finite, No Inf)</div>
                 <div className="text-xs mt-1">NaN, ±0, No Inf, Has Subnormals</div>
               </button>
               <button
