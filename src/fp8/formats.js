@@ -27,14 +27,15 @@ export const calculateFP8Value = (sign, exp, mantissa, { exponentBits, mantissaB
       value = Math.pow(-1, sign) * Math.pow(2, actualExponent) * mantissaValue;
     }
   } else if (floatFormat === 'FN') {
+    const maxMantissa = (1 << mantissaBits) - 1;
     if (exp === 0 && mantissa === 0) {
       value = sign === 0 ? 0 : -0;
       type = 'zero';
-    } else if (exp === maxExponent) {
+    } else if (exp === maxExponent && mantissa === maxMantissa) {
       value = NaN;
       type = 'nan';
     } else {
-      const actualExponent = exp - exponentBias;
+      const actualExponent = exp === 0 ? 1 - exponentBias : exp - exponentBias;
       const mantissaValue = (exp === 0) ?
         (mantissa / Math.pow(2, mantissaBits)) :
         (1 + mantissa / Math.pow(2, mantissaBits));
