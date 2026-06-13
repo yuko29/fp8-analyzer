@@ -7,6 +7,7 @@ const CHART_CHROME = 100;
 const PLOT_LEFT_OFFSET = 100; // YAxis width (90) + ScatterChart left margin (10)
 const PLOT_RIGHT_OFFSET = 30; // ScatterChart right margin
 const ZOOM_FACTOR = 1.2;
+const MIN_POINT_GAP_PX = 2;
 
 // Symmetric-log transform: linear near 0 (within threshold), log-scaled outside.
 const symlog = (x, threshold) => {
@@ -60,6 +61,7 @@ const StripChart = ({ datasets, scale, colors, title }) => {
   const [isPanning, setIsPanning] = useState(false);
   const [centerInput, setCenterInput] = useState('');
   const [centerFocused, setCenterFocused] = useState(false);
+  const [chartWidth, setChartWidth] = useState(0);
   const wrapperRef = useRef(null);
   const panAnchorRef = useRef(null);
 
@@ -68,7 +70,7 @@ const StripChart = ({ datasets, scale, colors, title }) => {
     let minPositive = Infinity;
 
     datasets.forEach((ds) => {
-      if (!ds.data) return;
+      if (!ds.data?.distributionData) return;
       ds.data.distributionData.forEach((p) => {
         const a = Math.abs(p.value);
         if (a > maxAbs) maxAbs = a;
@@ -84,7 +86,7 @@ const StripChart = ({ datasets, scale, colors, title }) => {
     // from the dot the user was actually hovering. Per-point color is set via shape below.
     // Y is inverted (format 0 → highest y) so the first FormatList entry renders at the top.
     const allPoints = datasets.flatMap((ds, rowIdx) => {
-      if (!ds.data) return [];
+      if (!ds.data?.distributionData) return [];
       const color = colors[rowIdx % colors.length];
       const y = (datasets.length - 1) - rowIdx;
       return ds.data.distributionData.map((p) => ({
@@ -127,12 +129,57 @@ const StripChart = ({ datasets, scale, colors, title }) => {
   const xTickFormatter = (xp) => formatReal(scale === 'symlog' ? symlogInverse(xp, threshold) : xp);
   const yTickFormatter = (yVal) => datasets[(datasets.length - 1) - yVal]?.config?.name ?? '';
 
+  const visiblePoints = useMemo(() => {
+    if (scale !== 'linear') return allPoints;
+
+    const [lo, hi] = xDomain;
+    const range = hi - lo;
+    if (!(range > 0)) return [];
+
+    const plotWidth = chartWidth - PLOT_LEFT_OFFSET - PLOT_RIGHT_OFFSET;
+    if (plotWidth <= 0) {
+      return allPoints.filter((p) => p.x >= lo && p.x <= hi);
+    }
+
+    const seen = new Set();
+    const points = [];
+    for (const p of allPoints) {
+      if (p.x < lo || p.x > hi) continue;
+
+      const pixelBucket = Math.round(((p.x - lo) / range) * plotWidth / MIN_POINT_GAP_PX);
+      const key = `${p.y}:${pixelBucket}`;
+      if (seen.has(key)) continue;
+
+      seen.add(key);
+      points.push(p);
+    }
+
+    return points;
+  }, [allPoints, chartWidth, scale, xDomain]);
+
   const getPlotMetrics = useCallback(() => {
     if (!wrapperRef.current) return null;
     const rect = wrapperRef.current.getBoundingClientRect();
     const width = rect.width - PLOT_LEFT_OFFSET - PLOT_RIGHT_OFFSET;
     if (width <= 0) return null;
     return { width, left: rect.left + PLOT_LEFT_OFFSET };
+  }, []);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    const updateWidth = () => setChartWidth(el.getBoundingClientRect().width);
+    updateWidth();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateWidth);
+      return () => window.removeEventListener('resize', updateWidth);
+    }
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   // Wheel zoom — anchored at cursor value. Uses a native non-passive listener
@@ -304,7 +351,7 @@ const StripChart = ({ datasets, scale, colors, title }) => {
             />
             <Tooltip content={<CompareTooltip />} cursor={{ strokeDasharray: '3 3' }} isAnimationActive={false} />
             <Scatter
-              data={allPoints}
+              data={visiblePoints}
               shape={({ cx, cy, payload }) => (
                 <circle cx={cx} cy={cy} r={3} fill={payload.color} />
               )}

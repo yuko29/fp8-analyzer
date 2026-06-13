@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { generateFP8Data } from '../fp8/generate';
+import React, { useState, useMemo, useRef } from 'react';
+import { generateFP8DistributionData } from '../fp8/generate';
 import FormatList from './FormatList';
 import StripChart from './StripChart';
 
@@ -12,13 +12,34 @@ const DEFAULT_CONFIGS = [
   { id: newId(), name: 'E5M2 IEEE', exponentBits: 5, mantissaBits: 2, exponentBias: 15, floatFormat: 'IEEE' },
 ];
 
+const dataKeyFor = ({ exponentBits, mantissaBits, exponentBias, floatFormat }) =>
+  `${exponentBits}:${mantissaBits}:${exponentBias}:${floatFormat}`;
+
 const CompareView = () => {
   const [formatConfigs, setFormatConfigs] = useState(DEFAULT_CONFIGS);
+  const dataCacheRef = useRef(new Map());
 
-  const datasets = useMemo(
-    () => formatConfigs.map((cfg) => ({ config: cfg, data: generateFP8Data(cfg) })),
-    [formatConfigs]
-  );
+  const datasets = useMemo(() => {
+    const cache = dataCacheRef.current;
+    const activeKeys = new Set();
+
+    const nextDatasets = formatConfigs.map((cfg) => {
+      const key = dataKeyFor(cfg);
+      activeKeys.add(key);
+
+      if (!cache.has(key)) {
+        cache.set(key, { distributionData: generateFP8DistributionData(cfg) });
+      }
+
+      return { config: cfg, data: cache.get(key) };
+    });
+
+    for (const key of cache.keys()) {
+      if (!activeKeys.has(key)) cache.delete(key);
+    }
+
+    return nextDatasets;
+  }, [formatConfigs]);
 
   const handleChange = (idx, newCfg) => {
     setFormatConfigs((prev) => prev.map((c, i) => (i === idx ? newCfg : c)));
