@@ -4,7 +4,7 @@ export const HISTOGRAM_BINS = 20;
 
 // Enumerate all 8-bit patterns under the given format and return everything
 // the UI needs: stats, sorted distribution points (with mid-centered index),
-// and log-binned histogram. Returns null if the bit configuration is invalid.
+// and base-2 log-binned histogram. Returns null if the bit configuration is invalid.
 export const generateFP8Data = (formatConfig) => {
   const { exponentBits, mantissaBits } = formatConfig;
   const totalBits = 8;
@@ -58,13 +58,13 @@ export const generateFP8Data = (formatConfig) => {
 
   let histogramData = [];
   if (stats.minPositive !== 0 && stats.maxPositive !== stats.minPositive) {
-    const minLog = Math.log10(stats.minPositive);
-    const maxLog = Math.log10(stats.maxPositive);
+    const minLog = Math.log2(stats.minPositive);
+    const maxLog = Math.log2(stats.maxPositive);
     const binSize = (maxLog - minLog) / HISTOGRAM_BINS;
     const histogram = new Array(HISTOGRAM_BINS).fill(0);
 
     for (const { value } of rawFinite) {
-      const logVal = Math.log10(Math.abs(value));
+      const logVal = Math.log2(Math.abs(value));
       const binIdx = Math.min(Math.floor((logVal - minLog) / binSize), HISTOGRAM_BINS - 1);
       if (binIdx >= 0) histogram[binIdx]++;
     }

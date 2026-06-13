@@ -4,6 +4,12 @@ import { Settings, ZoomIn, ZoomOut } from 'lucide-react';
 import { generateFP8Data } from './fp8/generate';
 import CompareView from './compare/CompareView';
 
+const formatPowerOfTwo = (exponent) => {
+  const rounded = Math.round(exponent);
+  const value = Math.abs(exponent - rounded) < 0.01 ? rounded : Number(exponent).toFixed(1);
+  return `2^${value}`;
+};
+
 const FP8Analyzer = () => {
 
   const [mode, setMode] = useState('single');
@@ -22,6 +28,18 @@ const FP8Analyzer = () => {
     [exponentBits, mantissaBits, exponentBias, floatFormat]
   );
   const { stats, distributionData, histogramData } = fp8Data ?? { stats: null, distributionData: [], histogramData: [] };
+  const histogramTicks = useMemo(() => {
+    if (histogramData.length === 0) return [];
+
+    const minBin = Math.min(...histogramData.map(({ bin }) => bin));
+    const maxBin = Math.max(...histogramData.map(({ bin }) => bin));
+    const minTick = Math.ceil(minBin);
+    const maxTick = Math.floor(maxBin);
+
+    if (minTick > maxTick) return [Math.round((minBin + maxBin) / 2)];
+
+    return Array.from({ length: maxTick - minTick + 1 }, (_, idx) => minTick + idx);
+  }, [histogramData]);
 
   const zoomOut = () => {
     setZoomState({ left: 'dataMin', right: 'dataMax', top: 'dataMax', bottom: 'dataMin' });
@@ -374,9 +392,15 @@ const FP8Analyzer = () => {
               <XAxis 
                 dataKey="bin" 
                 stroke="#fff"
-                tickFormatter={(val) => Math.pow(10, val).toFixed(4)}
+                type="number"
+                domain={['dataMin', 'dataMax']}
+                tickFormatter={formatPowerOfTwo}
+                ticks={histogramTicks}
+                interval={0}
+                tickLine={{ stroke: '#fff' }}
+                axisLine={{ stroke: '#fff' }}
                 label={{ 
-                  value: 'Value Range', 
+                  value: 'Value Range (2^n)', 
                   position: 'insideBottom', 
                   offset: -50, 
                   fill: '#fff' 
@@ -397,7 +421,7 @@ const FP8Analyzer = () => {
               />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }}
-                labelFormatter={(val) => `Range: 10^${val.toFixed(2)}`}
+                labelFormatter={(val) => `Range: ${formatPowerOfTwo(val)}`}
               />
               <Line type="monotone" dataKey="count" stroke="#34d399" strokeWidth={2} dot={false} />
             </LineChart>
